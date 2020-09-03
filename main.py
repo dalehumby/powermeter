@@ -8,20 +8,20 @@ import ujson
 esp.osdebug(None)
 
 with open("config.json", "r") as f:
-    config = ujson.load(f.read())
-
+    config = ujson.load(f)
 station = network.WLAN(network.STA_IF)
 station.active(True)
 station.connect(config["wifi"]["ssid"], config["wifi"]["password"])
-
 while not station.isconnected():
     pass
-
 print("Connection successful")
 print(station.ifconfig())
 gc.collect()
 
 led = Pin(2, Pin.OUT)
+
+with open("index.html", "r") as f:
+    index_template = f.read()
 
 
 def web_page():
@@ -29,19 +29,7 @@ def web_page():
         gpio_state = "ON"
     else:
         gpio_state = "OFF"
-
-    html = (
-        """<html><head> <title>ESP Web Server</title> <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="data:,"> <style>html{font-family: Helvetica; display:inline-block; margin: 0px auto; text-align: center;}
-  h1{color: #0F3376; padding: 2vh;}p{font-size: 1.5rem;}.button{display: inline-block; background-color: #e7bd3b; border: none;
-  border-radius: 4px; color: white; padding: 16px 40px; text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}
-  .button2{background-color: #4286f4;}</style></head><body> <h1>ESP Web Server</h1>
-  <p>GPIO state: <strong>"""
-        + gpio_state
-        + """</strong></p><p><a href="/?led=on"><button class="button">ON</button></a></p>
-  <p><a href="/?led=off"><button class="button button2">OFF</button></a></p></body></html>"""
-    )
-    return html
+    return index_template.format(gpio_state=gpio_state)
 
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
