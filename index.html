@@ -1,6 +1,6 @@
 <html>
   <head> 
-    <title>ESP Web Server</title> 
+    <title>Power meter server</title> 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="data:,"> 
     <style>
@@ -15,15 +15,17 @@
   </style>
   </head>
   <body>
-    <h1>ESP Web Server</h1>
+    <h1>Power meter server</h1>
     <p>
-      GPIO state: <strong>{gpio_state}</strong>
+      kWh remaining: <strong>{kwh}</strong>
     </p>
     <p>
-      <a href="/?led=on"><button class="button">ON</button></a>
-    </p>
-    <p>
-      <a href="/?led=off"><button class="button button2">OFF</button></a>
+      Set remaining kWh
+      <form action"/" method="post">
+        <label for="kwh">kWh:</label>
+        <input type="text" name="kwh" id="kwh">
+        <input type="submit" value="Save">
+      </form>
     </p>
   </body>
 </html>
