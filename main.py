@@ -1,15 +1,74 @@
 import gc
 
+import btree
 import esp
 import network
 import ujson
 import usocket as socket
 from machine import Pin
 
+
+def handle_input_pin(state):
+    """Interrupt handler routine for input pin state change."""
+    global kwh
+    kwh = kwh - kwh_per_flash
+    # TODO every change by 0.1 kWh write to DB
+    # TODO change the kwh thing to a class with DB stuff hidden within
+
+
+def handle_get():
+    """
+    Handle the http GET method
+
+    Retrieve the latest stats and return the rendered webpage
+    """
+    return index_template.format(kwh=kwh)
+
+
+def handle_post(request):
+    """Handle the http POST method.
+
+    Get the request, pull out the kwh and persist
+    """
+    global kwh
+    loc = request.find("kwh=")
+    param = request[loc:-1]
+    kwh = float(param.split("=")[1])
+    db[b"kwh"] = str(kwh)
+    db.flush()
+    print("Saved new kWh to DB: {kwh}".format(kwh=kwh))
+
+
 esp.osdebug(None)
 
 with open("config.json", "r") as f:
     config = ujson.load(f)
+
+with open("index.html", "r") as f:
+    index_template = f.read()
+
+# Open or create the database
+try:
+    dbfile = open("db", "r+b")
+    print("Opened DB")
+except OSError:
+    dbfile = open("db", "w+b")
+    print("Created DB")
+db = btree.open(dbfile)
+
+# Initialise the kwh value if it's not in DB
+if b"kwh" not in db:
+    db["kwh"] = str(0)
+    db.flush()
+    print("Initialised DB")
+kwh = float(db[b"kwh"])
+kwh_per_flash = 1 / config["pulse_per_kwh"]
+
+# Setup hardware
+input_pin = Pin(config["input_pin"], Pin.IN, Pin.PULL_UP)
+input_pin.irq(trigger=Pin.IRQ_RISING, handler=handle_input_pin)
+
+# Setup Wifi
 station = network.WLAN(network.STA_IF)
 station.active(True)
 station.connect(config["wifi"]["ssid"], config["wifi"]["password"])
@@ -19,38 +78,10 @@ print("Connected to wifi")
 print(station.ifconfig())
 gc.collect()
 
-led = Pin(2, Pin.OUT)  # TODO replace with correct pin and handler function
-
-with open("index.html", "r") as f:
-    index_template = f.read()
-
-
-def handle_get():
-    """
-    Handle the http GET method
-
-    Retrieve the latest stats and return the rendered webpage
-    """
-    kwh = 100.3
-    return index_template.format(kwh=kwh)
-
-
-def handle_post(request):
-    """Handle the http POST method.
-
-    Get the request, pull out the kwh and persist
-    """
-    loc = request.find("kwh=")
-    param = request[loc:-1]
-    _, kwh = param.split("=")
-    return float(kwh)
-
-
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(("", 80))
 s.listen(5)
 print("Ready for connections")
-
 
 while True:
     conn, addr = s.accept()
@@ -67,8 +98,8 @@ while True:
         if request.find("kwh=") < 0:
             # Browsers send a lot of headers, so try get more data if not found body yet
             request = str(conn.recv(1024))
-        kwh = handle_post(request)
-        print(kwh)
+        handle_post(request)
+        # Redirect back to /
         conn.send("HTTP/1.1 301 Found\n")
         conn.send("Location: /\n")
         response = None
@@ -81,3 +112,7 @@ while True:
         conn.sendall(response)
     conn.close()
     gc.collect()
+
+# This will never be executed
+db.close()
+dbfile.close()

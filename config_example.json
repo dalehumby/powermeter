@@ -2,5 +2,7 @@
   "wifi": {
     "ssid": "your-ssid",
     "password": "your-password"
-  }
+  },
+  "pulse_per_kwh": 1000,
+  "input_pin": 2
 }

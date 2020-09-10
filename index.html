@@ -7,11 +7,6 @@
       html {{font-family: Helvetica; display:inline-block; margin: 0px auto; text-align: center;}}
       h1{{color: #0F3376; padding: 2vh;}}
       p{{font-size: 1.5rem;}}
-      .button{{
-          display: inline-block; background-color: #e7bd3b; border: none; 
-          border-radius: 4px; color: white; padding: 16px 40px; 
-          text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}}
-      .button2{{background-color: #4286f4;}}
   </style>
   </head>
   <body>
@@ -23,7 +18,7 @@
       Set remaining kWh
       <form action"/" method="post">
         <label for="kwh">kWh:</label>
-        <input type="text" name="kwh" id="kwh">
+        <input type="number" min="0" step="0.1" value="0" name="kwh" id="kwh">
         <input type="submit" value="Save">
       </form>
     </p>
