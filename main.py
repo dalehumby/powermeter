@@ -8,12 +8,53 @@ import usocket as socket
 from machine import Pin
 
 
+class PowerMeter:
+    """Keep track of the kWh used."""
+
+    def __init__(self, pulse_per_kwh):
+        self._kwh_per_pulse = 1 / pulse_per_kwh
+        self._round = (
+            len(str(pulse_per_kwh)) - 1
+        )  # Hacky way to get order of magnitude. No log10
+        self._persist_counter = 0
+        # Open or create the database
+        try:
+            self._dbfile = open("db", "r+b")
+            print("Opened DB")
+        except OSError:
+            self._dbfile = open("db", "w+b")
+            print("Created DB")
+        self._db = btree.open(self._dbfile)
+
+        # Initialise the kwh value if it's not in DB
+        if b"kwh" not in self._db:
+            self._db["kwh"] = str(0)
+            self._db.flush()
+            print("Initialised DB")
+        self.kwh = float(self._db[b"kwh"])
+
+    def set(self, kwh):
+        """Set a new kWh and persist to DB."""
+        self.kwh = kwh
+        self._db[b"kwh"] = str(self.kwh)
+        self._db.flush()
+        print("Saved kWh to DB: {kwh}".format(kwh=self.kwh))
+
+    def dec(self):
+        """Decrement the kWh each time this is called."""
+        self.kwh = round(
+            self.kwh - self._kwh_per_pulse, self._round
+        )  # Handle float issues by rounding
+        self._persist_counter += 1
+        # Write to flash periodically
+        if self._persist_counter % 10 == 0:
+            self._persist_counter = 0
+            self.set(self.kwh)
+
+
 def handle_input_pin(state):
     """Interrupt handler routine for input pin state change."""
-    global kwh
-    kwh = kwh - kwh_per_flash
-    # TODO every change by 0.1 kWh write to DB
-    # TODO change the kwh thing to a class with DB stuff hidden within
+    power_remain.dec()
 
 
 def handle_get():
@@ -22,7 +63,7 @@ def handle_get():
 
     Retrieve the latest stats and return the rendered webpage
     """
-    return index_template.format(kwh=kwh)
+    return index_template.format(kwh=power_remain.kwh)
 
 
 def handle_post(request):
@@ -30,13 +71,10 @@ def handle_post(request):
 
     Get the request, pull out the kwh and persist
     """
-    global kwh
     loc = request.find("kwh=")
     param = request[loc:-1]
     kwh = float(param.split("=")[1])
-    db[b"kwh"] = str(kwh)
-    db.flush()
-    print("Saved new kWh to DB: {kwh}".format(kwh=kwh))
+    power_remain.set(kwh)
 
 
 esp.osdebug(None)
@@ -47,22 +85,7 @@ with open("config.json", "r") as f:
 with open("index.html", "r") as f:
     index_template = f.read()
 
-# Open or create the database
-try:
-    dbfile = open("db", "r+b")
-    print("Opened DB")
-except OSError:
-    dbfile = open("db", "w+b")
-    print("Created DB")
-db = btree.open(dbfile)
-
-# Initialise the kwh value if it's not in DB
-if b"kwh" not in db:
-    db["kwh"] = str(0)
-    db.flush()
-    print("Initialised DB")
-kwh = float(db[b"kwh"])
-kwh_per_flash = 1 / config["pulse_per_kwh"]
+power_remain = PowerMeter(config["pulse_per_kwh"])
 
 # Setup hardware
 input_pin = Pin(config["input_pin"], Pin.IN, Pin.PULL_UP)
@@ -89,6 +112,7 @@ while True:
     request = str(conn.recv(1024))
     print("Content = %s" % request)
     if request.find("GET / ") >= 0:
+        handle_input_pin(1)  # TODO remove me
         print("Handle GET")
         response = handle_get()
         conn.send("HTTP/1.1 200 OK\n")
@@ -112,7 +136,3 @@ while True:
         conn.sendall(response)
     conn.close()
     gc.collect()
-
-# This will never be executed
-db.close()
-dbfile.close()
