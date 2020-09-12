@@ -77,9 +77,9 @@ def handle_post(request):
 
     Get the request, pull out the kwh and persist.
     """
-    loc = request.find("kwh=")
-    param = request[loc:-1]
-    power_remain.kwh = float(param.split("=")[1])
+    loc = request.find(b"kwh=")
+    param = request[loc:]
+    power_remain.kwh = float(param.split(b"=")[1])
 
 
 esp.osdebug(None)
@@ -114,19 +114,19 @@ print("Ready for connections")
 while True:
     conn, addr = s.accept()
     print("Got a connection from %s" % str(addr))
-    request = str(conn.recv(1024))
+    request = conn.recv(1024)
     print("Content = %s" % request)
-    if request.find("GET / ") >= 0:
+    if request.find(b"GET / ") >= 0:
         handle_input_pin(1)  # TODO remove me
         print("Handle GET")
         response = handle_get()
         conn.send("HTTP/1.1 200 OK\n")
         conn.send("Content-Type: text/html\n")
-    elif request.find("POST / ") >= 0:
+    elif request.find(b"POST / ") >= 0:
         print("Handle POST")
-        if request.find("kwh=") < 0:
+        if request.find(b"\r\n\r\n") < 0:
             # Browsers send a lot of headers, so try get more data if not found body yet
-            request = str(conn.recv(1024))
+            request = conn.recv(1024)
         handle_post(request)
         # Redirect back to /
         conn.send("HTTP/1.1 301 Found\n")
