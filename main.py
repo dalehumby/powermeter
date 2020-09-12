@@ -12,12 +12,12 @@ class PowerMeter:
     """Keep track of the kWh used."""
 
     def __init__(self, pulse_per_kwh):
+        """Setup, including initialsing the database if it doesnt exist."""
         self._kwh_per_pulse = 1 / pulse_per_kwh
         self._round = (
             len(str(pulse_per_kwh)) - 1
         )  # Hacky way to get order of magnitude. No log10
         self._persist_counter = 0
-        # Open or create the database
         try:
             self._dbfile = open("db", "r+b")
             print("Opened DB")
@@ -25,31 +25,37 @@ class PowerMeter:
             self._dbfile = open("db", "w+b")
             print("Created DB")
         self._db = btree.open(self._dbfile)
-
-        # Initialise the kwh value if it's not in DB
         if b"kwh" not in self._db:
             self._db["kwh"] = str(0)
             self._db.flush()
             print("Initialised DB")
-        self.kwh = float(self._db[b"kwh"])
+        self._kwh = float(self._db[b"kwh"])
 
-    def set(self, kwh):
+    @property
+    def kwh(self):
+        return self._kwh
+
+    @kwh.setter
+    def kwh(self, value):
         """Set a new kWh and persist to DB."""
-        self.kwh = kwh
-        self._db[b"kwh"] = str(self.kwh)
+        self._kwh = value
+        self._db[b"kwh"] = str(self._kwh)
         self._db.flush()
-        print("Saved kWh to DB: {kwh}".format(kwh=self.kwh))
+        print("Saved kWh to DB: {kwh}".format(kwh=self._kwh))
 
     def dec(self):
-        """Decrement the kWh each time this is called."""
-        self.kwh = round(
-            self.kwh - self._kwh_per_pulse, self._round
+        """
+        Decrement the kWh each time this is called.
+
+        Only write to flash periodically.
+        """
+        self._kwh = round(
+            self._kwh - self._kwh_per_pulse, self._round
         )  # Handle float issues by rounding
         self._persist_counter += 1
-        # Write to flash periodically
         if self._persist_counter % 10 == 0:
             self._persist_counter = 0
-            self.set(self.kwh)
+            self.kwh = self._kwh
 
 
 def handle_input_pin(state):
@@ -59,9 +65,9 @@ def handle_input_pin(state):
 
 def handle_get():
     """
-    Handle the http GET method
+    Handle the http GET method.
 
-    Retrieve the latest stats and return the rendered webpage
+    Retrieve the latest stats and return the rendered webpage.
     """
     return index_template.format(kwh=power_remain.kwh)
 
@@ -69,12 +75,11 @@ def handle_get():
 def handle_post(request):
     """Handle the http POST method.
 
-    Get the request, pull out the kwh and persist
+    Get the request, pull out the kwh and persist.
     """
     loc = request.find("kwh=")
     param = request[loc:-1]
-    kwh = float(param.split("=")[1])
-    power_remain.set(kwh)
+    power_remain.kwh = float(param.split("=")[1])
 
 
 esp.osdebug(None)
