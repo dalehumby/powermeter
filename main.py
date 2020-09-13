@@ -6,12 +6,14 @@ import network
 import ntptime
 import ujson
 import usocket as socket
+import utime
 from machine import RTC, Pin, Timer
 
 from micropython import alloc_emergency_exception_buf, schedule
 
 MS_IN_MINUTE = 1000 * 60
 MS_IN_HOUR = MS_IN_MINUTE * 60
+UNIX_EPOCH_OFFSET = 946684800  # Seconds between Unix Epoch (1 Jan 1970) and MicroPython Epoch (1 Jan 2000)
 
 
 class PowerMeter:
@@ -50,7 +52,8 @@ class PowerMeter:
             period=MS_IN_MINUTE, mode=Timer.PERIODIC, callback=self.timer_handler
         )
         self._pulses_per_minute = 0
-        self.avg = []
+        self.kw_history = []
+        self.joules = 0
 
     @property
     def kwh(self):
@@ -88,12 +91,14 @@ class PowerMeter:
         Keep history of last 120 minutes.
         """
         print("Pulses in last 1 min:", self._pulses_per_minute)
-        avg_kwh_1min = self._pulses_per_minute * 60 * self._kwh_per_pulse
+        avg_kw_1min = self._pulses_per_minute * 60 * self._kwh_per_pulse
         self._pulses_per_minute = 0
-        self.avg.append(avg_kwh_1min)
-        self.avg = self.avg[-120:]
-        print("1 min avg:", avg_kwh_1min, "kW")
-        print("Last 120 min:", self.avg)
+        self.kw_history.append(avg_kw_1min)
+        self.kw_history = self.kw_history[-120:]
+        self.joules += avg_kw_1min * 1000 / 60  # 1 J = 1 W.s
+        print("1 min avg:", avg_kw_1min, "kW")
+        print("Total Joules since startup", self.joules, "J")
+        print("Last 120 min:", self.kw_history)
 
 
 def pulse_isr(state):
@@ -137,6 +142,16 @@ def handle_post(request):
     power_meter.kwh = float(param.split(b"=")[1])
 
 
+def handle_metrics():
+    """Handle the Prometheus metrics request."""
+    return metrics_template.format(
+        timestamp=utime.time() + UNIX_EPOCH_OFFSET,
+        kwh=power_meter.kwh,
+        watts=power_meter.kw_history[-1] * 1000 if power_meter.kw_history else "NaN",
+        joules=power_meter.joules,
+    )
+
+
 esp.osdebug(None)
 alloc_emergency_exception_buf(100)
 
@@ -145,6 +160,9 @@ with open("config.json", "r") as f:
 
 with open("index.html", "r") as f:
     index_template = f.read()
+
+with open("metrics", "r") as f:
+    metrics_template = f.read()
 
 power_meter = PowerMeter(config["pulse_per_kwh"])
 
@@ -196,6 +214,11 @@ while True:
         conn.send("HTTP/1.1 301 Found\n")
         conn.send("Location: /\n")
         response = None
+    elif request.find(b"GET /metrics ") >= 0:
+        print("Handle metrics")
+        response = handle_metrics()
+        conn.send("HTTP/1.1 200 OK\n")
+        conn.send("Content-Type: text/plain\n")
     else:
         print("Not Found")
         conn.send("HTTP/1.1 404 Not Found\n")

@@ -1,0 +1,11 @@
+# HELP power_remain_kwh Total power remaining in kWh
+# TYPE power_remain_kwh gauge
+power_remain_kwh {kwh} {timestamp}
+
+# HELP power_watts Average power (in Watts) over the last minute
+# TYPE power_watts gauge
+power_watts {watts} {timestamp}
+
+# HELP power_total_joules Total power (in Joules) used since startup
+# TYPE power_total_joules counter
+power_total_joules {joules} {timestamp}
