@@ -3,9 +3,12 @@ import gc
 import btree
 import esp
 import network
+import ntptime
 import ujson
 import usocket as socket
-from machine import Pin
+from machine import RTC, Pin, Timer
+
+MS_IN_HOUR = 1000 * 60 * 60
 
 
 class PowerMeter:
@@ -63,6 +66,15 @@ def handle_input_pin(state):
     power_remain.dec()
 
 
+def resync_rtc(timer_id):
+    """
+    Resync the RTC to NTP every 1 hour.
+
+    See http://docs.micropython.org/en/latest/esp8266/general.html?highlight=ntptime#real-time-clock"""
+    ntptime.settime()
+    print("Resync RTC to", rtc.datetime())
+
+
 def handle_get():
     """
     Handle the http GET method.
@@ -104,6 +116,15 @@ while not station.isconnected():
     pass
 print("Connected to wifi")
 print(station.ifconfig())
+
+# Setup realtime clock
+rtc = RTC()
+ntptime.settime()
+print("Set time to", rtc.datetime())
+resync_rtc_timer = Timer(-1)
+resync_rtc_timer.init(period=MS_IN_HOUR, mode=Timer.PERIODIC, callback=resync_rtc)
+
+# Run garbage collector
 gc.collect()
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
