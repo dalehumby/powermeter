@@ -130,13 +130,13 @@ gc.collect()
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(("", 80))
 s.listen(5)
-print("Ready for connections")
+print("Ready for http connections")
 
 while True:
     conn, addr = s.accept()
-    print("Got a connection from %s" % str(addr))
+    print("Got a connection from", str(addr))
     request = conn.recv(1024)
-    print("Content = %s" % request)
+    print(request)
     if request.find(b"GET / ") >= 0:
         handle_input_pin(1)  # TODO remove me
         print("Handle GET")
@@ -154,7 +154,7 @@ while True:
         conn.send("Location: /\n")
         response = None
     else:
-        print("Not found")
+        print("Not Found")
         conn.send("HTTP/1.1 404 Not Found\n")
         response = None
     conn.send("Connection: close\n\n")
