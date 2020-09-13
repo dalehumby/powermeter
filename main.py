@@ -8,6 +8,8 @@ import ujson
 import usocket as socket
 from machine import RTC, Pin, Timer
 
+from micropython import alloc_emergency_exception_buf, schedule
+
 MS_IN_HOUR = 1000 * 60 * 60
 
 
@@ -46,24 +48,29 @@ class PowerMeter:
         self._db.flush()
         print("Saved kWh to DB: {kwh}".format(kwh=self._kwh))
 
-    def dec(self):
+    def dec(self, amount):
         """
-        Decrement the kWh each time this is called.
+        Decrement the kWh by `amount` of pulses each time this is called.
 
         Only write to flash periodically.
         """
         self._kwh = round(
-            self._kwh - self._kwh_per_pulse, self._round
+            self._kwh - amount * self._kwh_per_pulse, self._round
         )  # Handle float issues by rounding
         self._persist_counter += 1
-        if self._persist_counter % 10 == 0:
+        if self._persist_counter % 100 == 0:
             self._persist_counter = 0
             self.kwh = self._kwh
 
 
-def handle_input_pin(state):
-    """Interrupt handler routine for input pin state change."""
-    power_remain.dec()
+def pulse_isr(state):
+    """
+    Interrupt service routine for input pin state change.
+
+    Schedule the decrement outside of the ISR.
+    """
+    print("Pulse ISR triggred")
+    schedule(power_remain.dec, 1)
 
 
 def resync_rtc(timer_id):
@@ -95,6 +102,7 @@ def handle_post(request):
 
 
 esp.osdebug(None)
+alloc_emergency_exception_buf(100)
 
 with open("config.json", "r") as f:
     config = ujson.load(f)
@@ -106,7 +114,7 @@ power_remain = PowerMeter(config["pulse_per_kwh"])
 
 # Setup hardware
 input_pin = Pin(config["input_pin"], Pin.IN, Pin.PULL_UP)
-input_pin.irq(trigger=Pin.IRQ_RISING, handler=handle_input_pin)
+input_pin.irq(trigger=Pin.IRQ_FALLING, handler=pulse_isr)
 
 # Setup Wifi
 station = network.WLAN(network.STA_IF)
@@ -138,7 +146,6 @@ while True:
     request = conn.recv(1024)
     print(request)
     if request.find(b"GET / ") >= 0:
-        handle_input_pin(1)  # TODO remove me
         print("Handle GET")
         response = handle_get()
         conn.send("HTTP/1.1 200 OK\n")
