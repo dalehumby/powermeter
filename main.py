@@ -10,11 +10,17 @@ from machine import RTC, Pin, Timer
 
 from micropython import alloc_emergency_exception_buf, schedule
 
-MS_IN_HOUR = 1000 * 60 * 60
+MS_IN_MINUTE = 1000 * 60
+MS_IN_HOUR = MS_IN_MINUTE * 60
 
 
 class PowerMeter:
-    """Keep track of the kWh used."""
+    """
+    Keep track of the kWh used.
+
+    kwh: Number of kWh remaining on the power meter. Should match the power meters LCD.
+    TODO averages 1, 5, 60,min, 24 hr
+    """
 
     def __init__(self, pulse_per_kwh):
         """Setup, including initialsing the database if it doesnt exist."""
@@ -23,6 +29,8 @@ class PowerMeter:
             len(str(pulse_per_kwh)) - 1
         )  # Hacky way to get order of magnitude. No log10
         self._persist_counter = 0
+
+        # Setup DB
         try:
             self._dbfile = open("db", "r+b")
             print("Opened DB")
@@ -36,6 +44,14 @@ class PowerMeter:
             print("Initialised DB")
         self._kwh = float(self._db[b"kwh"])
 
+        # Setup averages
+        self._timer = Timer(-1)
+        self._timer.init(
+            period=MS_IN_MINUTE, mode=Timer.PERIODIC, callback=self.timer_handler
+        )
+        self._pulses_per_minute = 0
+        self.avg = []
+
     @property
     def kwh(self):
         return self._kwh
@@ -48,12 +64,15 @@ class PowerMeter:
         self._db.flush()
         print("Saved kWh to DB: {kwh}".format(kwh=self._kwh))
 
-    def dec(self, amount):
+    def count(self, amount):
         """
-        Decrement the kWh by `amount` of pulses each time this is called.
+        Keep track of power usage.
 
+        Count the number of pulses since startup.
+        Decrement the kWh by `amount` of pulses each time this is called.
         Only write to flash periodically.
         """
+        self._pulses_per_minute += amount
         self._kwh = round(
             self._kwh - amount * self._kwh_per_pulse, self._round
         )  # Handle float issues by rounding
@@ -61,6 +80,20 @@ class PowerMeter:
         if self._persist_counter % 100 == 0:
             self._persist_counter = 0
             self.kwh = self._kwh
+
+    def timer_handler(self, timer_id):
+        """
+        Calculate the average power usage per minute.
+
+        Keep history of last 120 minutes.
+        """
+        print("Pulses in last 1 min:", self._pulses_per_minute)
+        avg_kwh_1min = self._pulses_per_minute * 60 * self._kwh_per_pulse
+        self._pulses_per_minute = 0
+        self.avg.append(avg_kwh_1min)
+        self.avg = self.avg[-120:]
+        print("1 min avg:", avg_kwh_1min, "kW")
+        print("Last 120 min:", self.avg)
 
 
 def pulse_isr(state):
@@ -70,7 +103,10 @@ def pulse_isr(state):
     Schedule the decrement outside of the ISR.
     """
     print("Pulse ISR triggred")
-    schedule(power_remain.dec, 1)
+    schedule(power_meter.count, 1)
+    # Idea: Sometimes get "RuntimeError: schedule queue full", so could put a try/except block
+    # and keep a count of times couldnt schedule the dec call, and then hand the count to dec
+    # May not be necessary because even at 50 A there are only 3.33 pulses per second
 
 
 def resync_rtc(timer_id):
@@ -88,7 +124,7 @@ def handle_get():
 
     Retrieve the latest stats and return the rendered webpage.
     """
-    return index_template.format(kwh=power_remain.kwh)
+    return index_template.format(kwh=power_meter.kwh)
 
 
 def handle_post(request):
@@ -98,7 +134,7 @@ def handle_post(request):
     """
     loc = request.find(b"kwh=")
     param = request[loc:]
-    power_remain.kwh = float(param.split(b"=")[1])
+    power_meter.kwh = float(param.split(b"=")[1])
 
 
 esp.osdebug(None)
@@ -110,7 +146,7 @@ with open("config.json", "r") as f:
 with open("index.html", "r") as f:
     index_template = f.read()
 
-power_remain = PowerMeter(config["pulse_per_kwh"])
+power_meter = PowerMeter(config["pulse_per_kwh"])
 
 # Setup hardware
 input_pin = Pin(config["input_pin"], Pin.IN, Pin.PULL_UP)
