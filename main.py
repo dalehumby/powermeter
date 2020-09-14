@@ -1,12 +1,18 @@
+"""
+Power Meter for recording electricity usage at home using MicroPython on ESP8266.
+
+Tested with MicroPython 1.13
+"""
+
 import gc
 
 import btree
 import esp
 import network
 import ntptime
-import ujson
+import ujson as json
 import usocket as socket
-import utime
+import utime as time
 from machine import RTC, Pin, Timer
 
 from micropython import alloc_emergency_exception_buf, schedule
@@ -16,12 +22,16 @@ MS_IN_HOUR = MS_IN_MINUTE * 60
 UNIX_EPOCH_OFFSET = 946684800  # Seconds between Unix Epoch (1 Jan 1970) and MicroPython Epoch (1 Jan 2000)
 
 
+def mean(lst):
+    """Helper function to calculate the mean of the values in a list."""
+    return sum(lst) / len(lst)
+
+
 class PowerMeter:
     """
     Keep track of the kWh used.
 
     kwh: Number of kWh remaining on the power meter. Should match the power meters LCD.
-    TODO averages 1, 5, 60,min, 24 hr
     """
 
     def __init__(self, pulse_per_kwh):
@@ -47,6 +57,7 @@ class PowerMeter:
         self._kwh = float(self._db[b"kwh"])
 
         # Setup averages
+        self.timestamp = "NaN"
         self._timer = Timer(-1)
         self._timer.init(
             period=MS_IN_MINUTE, mode=Timer.PERIODIC, callback=self.timer_handler
@@ -95,7 +106,8 @@ class PowerMeter:
         self._pulses_per_minute = 0
         self.kw_history.append(avg_kw_1min)
         self.kw_history = self.kw_history[-120:]
-        self.joules += avg_kw_1min * 1000 / 60  # 1 J = 1 W.s
+        self.joules += avg_kw_1min * 1000 * 60  # 1 J = 1 W.s
+        self.timestamp = (time.time() + UNIX_EPOCH_OFFSET) * 1000
         print("1 min avg:", avg_kw_1min, "kW")
         print("Total Joules since startup", self.joules, "J")
         print("Last 120 min:", self.kw_history)
@@ -133,7 +145,8 @@ def handle_get():
 
 
 def handle_post(request):
-    """Handle the http POST method.
+    """
+    Handle the http POST method.
 
     Get the request, pull out the kwh and persist.
     """
@@ -143,20 +156,35 @@ def handle_post(request):
 
 
 def handle_metrics():
-    """Handle the Prometheus metrics request."""
-    return metrics_template.format(
-        timestamp=utime.time() + UNIX_EPOCH_OFFSET,
-        kwh=power_meter.kwh,
-        watts=power_meter.kw_history[-1] * 1000 if power_meter.kw_history else "NaN",
-        joules=power_meter.joules,
-    )
+    """
+    Handle the Prometheus metrics request.
+
+    Prometheus timestamps are ms since Unix Epoch 1 Jan 1970.
+    Ref https://prometheus.io/docs/instrumenting/exposition_formats/
+    """
+    if power_meter.kw_history:
+        return metrics_template.format(
+            timenow=(time.time() + UNIX_EPOCH_OFFSET) * 1000,
+            timestamp=power_meter.timestamp,
+            kwh=power_meter.kwh,
+            watts_avg_1m=power_meter.kw_history[-1] * 1000,
+            watts_avg_5m=mean(power_meter.kw_history[-5:]) * 1000,
+            watts_avg_15m=mean(power_meter.kw_history[-15:]) * 1000,
+            watts_avg_60m=mean(power_meter.kw_history[-60:]) * 1000,
+            watts_avg_120m=mean(power_meter.kw_history[-120:]) * 1000,
+            joules=power_meter.joules,
+        )
+    else:
+        return ""
 
 
 esp.osdebug(None)
 alloc_emergency_exception_buf(100)
+print("Waiting 2s before starting up... press CTRL+C to abort")
+time.sleep(2)
 
 with open("config.json", "r") as f:
-    config = ujson.load(f)
+    config = json.load(f)
 
 with open("index.html", "r") as f:
     index_template = f.read()

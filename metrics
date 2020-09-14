@@ -1,11 +1,17 @@
+# Power Meter metrics
+
 # HELP power_remain_kwh Total power remaining in kWh
 # TYPE power_remain_kwh gauge
-power_remain_kwh {kwh} {timestamp}
+power_remain_kwh {kwh} {timenow}
 
-# HELP power_watts Average power (in Watts) over the last minute
+# HELP power_watts Average power (in Watts) used over last period
 # TYPE power_watts gauge
-power_watts {watts} {timestamp}
+power_watts{{avg="1min"}} {watts_avg_1m} {timestamp}
+power_watts{{avg="5min"}} {watts_avg_5m} {timestamp}
+power_watts{{avg="15min"}} {watts_avg_15m} {timestamp}
+power_watts{{avg="60min"}} {watts_avg_60m} {timestamp}
+power_watts{{avg="120min"}} {watts_avg_120m} {timestamp}
 
-# HELP power_total_joules Total power (in Joules) used since startup
-# TYPE power_total_joules counter
-power_total_joules {joules} {timestamp}
+# HELP power_joules_total Total power (in Joules) used since startup
+# TYPE power_joules_total counter
+power_joules_total {joules} {timestamp}
