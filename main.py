@@ -14,7 +14,6 @@ import ujson as json
 import usocket as socket
 import utime as time
 from machine import RTC, Pin, Timer
-
 from micropython import alloc_emergency_exception_buf, schedule
 
 MS_IN_MINUTE = 1000 * 60
@@ -41,6 +40,7 @@ class PowerMeter:
             len(str(pulse_per_kwh)) - 1
         )  # Hacky way to get order of magnitude. No log10
         self._persist_counter = 0
+        self._debounce_time = time.ticks_ms()
 
         # Setup DB
         try:
@@ -86,6 +86,11 @@ class PowerMeter:
         Decrement the kWh by `amount` of pulses each time this is called.
         Only write to flash periodically.
         """
+        if time.ticks_diff(time.ticks_ms(), self._debounce_time) < 50:
+            print("Debounce")
+            return
+        print("Count")
+        self._debounce_time = time.ticks_ms()
         self._pulses_per_minute += amount
         self._kwh = round(
             self._kwh - amount * self._kwh_per_pulse, self._round
@@ -119,7 +124,7 @@ def pulse_isr(state):
 
     Schedule the decrement outside of the ISR.
     """
-    print("Pulse ISR triggred")
+    print("Pulse ISR triggred", end=" ")
     schedule(power_meter.count, 1)
     # Idea: Sometimes get "RuntimeError: schedule queue full", so could put a try/except block
     # and keep a count of times couldnt schedule the dec call, and then hand the count to dec
@@ -175,7 +180,7 @@ def handle_metrics():
             joules=power_meter.joules,
         )
     else:
-        return ""
+        return "# Please wait 1 min for metrics"
 
 
 esp.osdebug(None)
@@ -195,8 +200,8 @@ with open("metrics", "r") as f:
 power_meter = PowerMeter(config["pulse_per_kwh"])
 
 # Setup hardware
-input_pin = Pin(config["input_pin"], Pin.IN, Pin.PULL_UP)
-input_pin.irq(trigger=Pin.IRQ_FALLING, handler=pulse_isr)
+input_pin = Pin(config["input_pin"], Pin.IN)
+input_pin.irq(handler=pulse_isr, trigger=Pin.IRQ_RISING)
 
 # Setup Wifi
 station = network.WLAN(network.STA_IF)
