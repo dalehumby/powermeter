@@ -17,7 +17,15 @@ Tested with MicroPython 1.13
 https://learn.sparkfun.com/tutorials/how-to-install-ch340-drivers/all
 
 ## How to install MicroPython on ESP8266 board
-TODO
+From https://docs.micropython.org/en/latest/esp8266/tutorial/intro.html
+Downloaded latest MicroPython 1.13: esp8266-20200911-v1.13.bin
+pip3 install esptool
+
+`esptool.py --help`
+
+`esptool.py erase_flash`
+
+`esptool.py --port /dev/tty.wchusbserial1410 --baud 460800 write_flash --flash_size=detect 0 ~/Downloads/esp8266-20200911-v1.13.bin`
 
 ## Connect to the boards REPL using WebREPL
 http://micropython.org/webrepl/#10.0.0.146:8266
@@ -36,4 +44,7 @@ Installation instructions at https://github.com/scientifichackers/ampy
 - To exit from Screen: `CTRL+A` `CTRL+\`
 - To abort the currently running program, get back to REPL: `CTRL+C`
 - To restart micro: `CTRL+D`
+
+# Where to buy
+- Communica supplies D1 Mini for < R100 (D1 Mini info https://www.wemos.cc/en/latest/tutorials/d1/get_started_with_micropython_d1.html)
  

@@ -1,7 +1,11 @@
 """
 Power Meter for recording electricity usage at home using MicroPython on ESP8266.
 
-Tested with MicroPython 1.13
+Tested with
+- MicroPython 1.13
+- Wemos D1 Mini:
+  - https://www.wemos.cc/en/latest/d1/d1_mini.html
+  - Pinout https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
 """
 
 import gc
@@ -200,8 +204,11 @@ with open("metrics", "r") as f:
 power_meter = PowerMeter(config["pulse_per_kwh"])
 
 # Setup hardware
-input_pin = Pin(config["input_pin"], Pin.IN)
-input_pin.irq(handler=pulse_isr, trigger=Pin.IRQ_RISING)
+pulse_pin = Pin(config["pulse_pin"], Pin.IN)
+pulse_pin.irq(handler=pulse_isr, trigger=Pin.IRQ_RISING)
+led_pin = Pin(
+    config["led_pin"], Pin.IN, Pin.PULL_UP
+)  # Set high impedence, turns off led
 
 # Setup Wifi
 station = network.WLAN(network.STA_IF)
@@ -210,6 +217,11 @@ station.connect(config["wifi"]["ssid"], config["wifi"]["password"])
 while not station.isconnected():
     pass
 print("Connected to wifi")
+# Set up static IP address if a static IP has been configured
+if "ip" in config["wifi"]:
+    ifconfig = list(station.ifconfig())
+    ifconfig[0] = config["wifi"]["ip"]
+    station.ifconfig(tuple(ifconfig))
 print(station.ifconfig())
 
 # Setup realtime clock
