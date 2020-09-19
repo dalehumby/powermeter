@@ -116,7 +116,7 @@ class PowerMeter:
         self.kw_history.append(avg_kw_1min)
         self.kw_history = self.kw_history[-120:]
         self.joules += avg_kw_1min * 1000 * 60  # 1 J = 1 W.s
-        self.timestamp = (time.time() + UNIX_EPOCH_OFFSET) * 1000
+        self.timestamp = time.time() + UNIX_EPOCH_OFFSET
         print("1 min avg:", avg_kw_1min, "kW")
         print("Total Joules since startup", self.joules, "J")
         print("Last 120 min:", self.kw_history)
@@ -169,12 +169,13 @@ def handle_metrics():
     Handle the Prometheus metrics request.
 
     Prometheus timestamps are ms since Unix Epoch 1 Jan 1970.
+    Units are base SI (watts, joules)
     Ref https://prometheus.io/docs/instrumenting/exposition_formats/
     """
     if power_meter.kw_history:
         return metrics_template.format(
             timenow=(time.time() + UNIX_EPOCH_OFFSET) * 1000,
-            timestamp=power_meter.timestamp,
+            timestamp=power_meter.timestamp * 1000,
             kwh=power_meter.kwh,
             watts_avg_1m=power_meter.kw_history[-1] * 1000,
             watts_avg_5m=mean(power_meter.kw_history[-5:]) * 1000,
