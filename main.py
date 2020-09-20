@@ -19,6 +19,7 @@ import usocket as socket
 import utime as time
 from machine import RTC, Pin, Timer
 from micropython import alloc_emergency_exception_buf, schedule
+from umqtt.simple import MQTTClient
 
 MS_IN_MINUTE = 1000 * 60
 MS_IN_HOUR = MS_IN_MINUTE * 60
@@ -188,6 +189,26 @@ def handle_metrics():
         return "# Please wait 1 min for metrics"
 
 
+def mqtt_pub(timer_id):
+    """
+    Periodically publish power metrics to MQTT.
+    """
+    print("Pubishing to MQTT")
+    metrics = {
+        "power_remain_kwh": power_meter.kwh,
+        "power_watts": {
+            "avg_1min": power_meter.kw_history[-1] * 1000
+            if power_meter.kw_history
+            else None
+        },
+    }
+    try:
+        mqtt.publish(b"powermeter", bytes(json.dumps(metrics), "utf-8"))
+    except OSError as e:
+        print("MQTT error:", e)
+        mqtt.connect()
+
+
 esp.osdebug(None)
 alloc_emergency_exception_buf(100)
 print("Waiting 2s before starting up... press CTRL+C to abort")
@@ -218,7 +239,8 @@ station.connect(config["wifi"]["ssid"], config["wifi"]["password"])
 while not station.isconnected():
     pass
 print("Connected to wifi")
-# Set up static IP address if a static IP has been configured
+
+# Setup static IP address if a static IP has been configured
 if "ip" in config["wifi"]:
     ifconfig = list(station.ifconfig())
     ifconfig[0] = config["wifi"]["ip"]
@@ -231,6 +253,12 @@ ntptime.settime()
 print("Set time to", rtc.datetime())
 resync_rtc_timer = Timer(-1)
 resync_rtc_timer.init(period=MS_IN_HOUR, mode=Timer.PERIODIC, callback=resync_rtc)
+
+# Setup MQTT
+mqtt = MQTTClient("powermeter", config["mqtt_server"])
+mqtt_pub_timer = Timer(-1)
+mqtt_pub_timer.init(period=MS_IN_MINUTE, mode=Timer.PERIODIC, callback=mqtt_pub)
+mqtt.connect()
 
 # Run garbage collector
 gc.collect()

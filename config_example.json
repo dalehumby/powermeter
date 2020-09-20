@@ -6,6 +6,7 @@
   },
   "pulse_per_kwh": 1000,
   "pulse_pin": 5,
-  "led_pin": 2
+  "led_pin": 2,
+  "mqtt_server": "10.0.0.10"
 }
 
