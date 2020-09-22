@@ -41,9 +41,6 @@ class PowerMeter:
     def __init__(self, pulse_per_kwh):
         """Setup, including initialsing the database if it doesnt exist."""
         self._kwh_per_pulse = 1 / pulse_per_kwh
-        self._round = (
-            len(str(pulse_per_kwh)) - 1
-        )  # Hacky way to get order of magnitude. No log10
         self._persist_counter = 0
         self._debounce_time = time.ticks_ms()
 
@@ -98,7 +95,7 @@ class PowerMeter:
         self._debounce_time = time.ticks_ms()
         self._pulses_per_minute += amount
         self._kwh = round(
-            self._kwh - amount * self._kwh_per_pulse, self._round
+            self._kwh - amount * self._kwh_per_pulse, 3
         )  # Handle float issues by rounding
         self._persist_counter += 1
         if self._persist_counter % 100 == 0:
