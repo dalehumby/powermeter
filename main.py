@@ -161,8 +161,11 @@ def handle_post(request):
     Get the request, pull out the kwh and persist.
     """
     loc = request.find(b"kwh=")
-    param = request[loc:]
-    power_meter.kwh = float(param.split(b"=")[1])
+    if loc >= 0:
+        param = request[loc:]
+        power_meter.kwh = float(param.split(b"=")[1])
+    else:
+        print("ERROR: Could not find kWh in request")
 
 
 def handle_metrics():
@@ -211,7 +214,9 @@ def mqtt_pub(timer_id):
 
 esp.osdebug(None)
 alloc_emergency_exception_buf(100)
-print("Waiting 2s before starting up... press CTRL+C to abort")
+
+# Wait before registering interrupts and timers
+print("Waiting 2s before starting up... press CTRL+C to get REPL")
 time.sleep(2)
 
 with open("config.json", "r") as f:
@@ -265,40 +270,45 @@ gc.collect()
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind(("", 80))
-s.listen(5)
+s.listen(10)
 print("Ready for http connections")
 
 while True:
-    conn, addr = s.accept()
-    print("Got a connection from", str(addr))
-    request = conn.recv(1024)
-    print(request)
-    if request.find(b"GET / ") >= 0:
-        print("Handle GET")
-        response = handle_get()
-        conn.send("HTTP/1.1 200 OK\n")
-        conn.send("Content-Type: text/html\n")
-    elif request.find(b"POST / ") >= 0:
-        print("Handle POST")
-        if request.find(b"\r\n\r\n") < 0:
-            # Browsers send a lot of headers, so try get more data if not found body yet
-            request = conn.recv(1024)
-        handle_post(request)
-        # Redirect back to /
-        conn.send("HTTP/1.1 301 Found\n")
-        conn.send("Location: /\n")
-        response = None
-    elif request.find(b"GET /metrics ") >= 0:
-        print("Handle metrics")
-        response = handle_metrics()
-        conn.send("HTTP/1.1 200 OK\n")
-        conn.send("Content-Type: text/plain\n")
-    else:
-        print("Not Found")
-        conn.send("HTTP/1.1 404 Not Found\n")
-        response = None
-    conn.send("Connection: close\n\n")
-    if response:
-        conn.sendall(response)
-    conn.close()
-    gc.collect()
+    try:
+        conn, addr = s.accept()
+        print("Got a connection from", str(addr))
+        request = conn.recv(1024)
+        print(request)
+        if request.find(b"GET / ") >= 0:
+            print("Handle GET")
+            response = handle_get()
+            conn.send("HTTP/1.1 200 OK\n")
+            conn.send("Content-Type: text/html\n")
+        elif request.find(b"POST / ") >= 0:
+            print("Handle POST")
+            if request.find(b"\r\n\r\n") < 0:
+                # Browsers send a lot of headers, so try get more data if not found body yet
+                request = conn.recv(1024)
+            handle_post(request)
+            # Redirect back to /
+            conn.send("HTTP/1.1 303 See Other\n")
+            conn.send("Location: /\n")
+            response = None
+        elif request.find(b"GET /metrics ") >= 0:
+            print("Handle metrics")
+            response = handle_metrics()
+            conn.send("HTTP/1.1 200 OK\n")
+            conn.send("Content-Type: text/plain\n")
+        else:
+            print("Not Found")
+            conn.send("HTTP/1.1 404 Not Found\n")
+            response = None
+        conn.send("Connection: close\n\n")
+        if response:
+            conn.sendall(response)
+    except Exception as e:
+        print("Error:", e)
+    finally:
+        if conn:
+            conn.close()
+        gc.collect()
