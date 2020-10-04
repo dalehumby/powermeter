@@ -184,6 +184,7 @@ def handle_metrics():
             watts_avg_60m=mean(power_meter.kw_history[-60:]) * 1000,
             watts_avg_120m=mean(power_meter.kw_history[-120:]) * 1000,
             joules=power_meter.joules,
+            boot_time=boot_time,
         )
     else:
         return "# Please wait 1 min for metrics"
@@ -253,6 +254,7 @@ print(station.ifconfig())
 rtc = RTC()
 ntptime.settime()
 print("Set time to", rtc.datetime())
+boot_time = time.time() + UNIX_EPOCH_OFFSET
 resync_rtc_timer = Timer(-1)
 resync_rtc_timer.init(period=MS_IN_HOUR, mode=Timer.PERIODIC, callback=resync_rtc)
 

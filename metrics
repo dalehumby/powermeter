@@ -15,3 +15,7 @@ power_watts{{avg="120min"}} {watts_avg_120m} {timestamp}
 # HELP power_joules_total Total power (in Joules) used since startup
 # TYPE power_joules_total counter
 power_joules_total {joules} {timestamp}
+
+# HELP power_boot_time_seconds Power meter boot time, in unixtime
+# TYPE power_boot_time_seconds gauge
+power_boot_time_seconds {boot_time} {timestamp}
