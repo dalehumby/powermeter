@@ -98,7 +98,7 @@ class PowerMeter:
             self._kwh - amount * self._kwh_per_pulse, 3
         )  # Handle float issues by rounding
         self._persist_counter += 1
-        if self._persist_counter % 100 == 0:
+        if self._persist_counter % 500 == 0:
             self._persist_counter = 0
             self.kwh = self._kwh
 
