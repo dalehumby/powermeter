@@ -17,7 +17,7 @@ import ntptime
 import ujson as json
 import usocket as socket
 import utime as time
-from machine import RTC, Pin, Timer
+from machine import RTC, Pin, Timer, reset
 from micropython import alloc_emergency_exception_buf, schedule
 from umqtt.simple import MQTTClient
 
@@ -270,8 +270,8 @@ s.bind(("", 80))
 s.listen(10)
 print("Ready for http connections")
 
-while True:
-    try:
+try:
+    while True:
         conn, addr = s.accept()
         print("Got a connection from", str(addr))
         request = conn.recv(1024)
@@ -303,9 +303,8 @@ while True:
         conn.send("Connection: close\n\n")
         if response:
             conn.sendall(response)
-    except Exception as e:
-        print("Error:", e)
-    finally:
-        if conn:
-            conn.close()
+        conn.close()
         gc.collect()
+except Exception as e:
+    print("Error:", e)
+    reset()
