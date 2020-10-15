@@ -4,10 +4,10 @@ Assumes your power meter has a flashing LED that flashes every e.g 1/1000th of
 a kWh and that you can place an optotransistor over the LED to trigger a pulse
 on a pin on the ESP8266.
 
-Presents a
+Features
 - Web page at `/` to get and set the kWh remaining on your prepaid electricity meter
-- Prometheus `/metrics` endpoint to get details about power usage
-- (FUTURE) Link to Home Assistant
+- Prometheus `/metrics` endpoint to get details about power usage for display in Grafana
+- Link to Home Assistant and Node-Red by publishing on the MQTT `powermeter` topic
 
 Tested with MicroPython 1.13
 
@@ -37,6 +37,8 @@ Installation instructions at https://github.com/scientifichackers/ampy
 - List files `ampy -p /dev/tty.wchusbserial1410 -b 115200 ls`
 - Run a file (even if it's not yet uploaded) `ampy -p /dev/tty.wchusbserial1410 -b 115200 run main.py`
 - Upload a file `ampy -p /dev/tty.wchusbserial1410 -b 115200 put main.py`
+- Upload all the files: `boot.py`, `main.py`, `config.json`, `index.html`, `metrics`
+- Note you will need to edit `config_example.json` to suit your requirements, and save as `config.json`
 
 ## Use Screen to view terminal output
 
@@ -46,5 +48,6 @@ Installation instructions at https://github.com/scientifichackers/ampy
 - To restart micro: `CTRL+D`
 
 # Where to buy
-- Communica supplies D1 Mini for < R100 (D1 Mini info https://www.wemos.cc/en/latest/tutorials/d1/get_started_with_micropython_d1.html)
+- [Communica](https://www.communica.co.za/products/bmt-d1-mini-pro-esp8266-16m-ant) or [Micro Robotics](https://www.robotics.org.za/MINI-D1-4M) supply a cheap [D1 Mini board](https://www.wemos.cc/en/latest/tutorials/d1/get_started_with_micropython_d1.html)
+
  
