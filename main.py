@@ -259,7 +259,12 @@ resync_rtc_timer = Timer(-1)
 resync_rtc_timer.init(period=MS_IN_HOUR, mode=Timer.PERIODIC, callback=resync_rtc)
 
 # Setup MQTT
-mqtt = MQTTClient("powermeter", config["mqtt_server"])
+mqtt = MQTTClient(
+    "powermeter",
+    config["mqtt"]["server"],
+    user=config["mqtt"]["username"],
+    password=config["mqtt"]["password"],
+)
 mqtt_pub_timer = Timer(-1)
 mqtt_pub_timer.init(period=MS_IN_MINUTE, mode=Timer.PERIODIC, callback=mqtt_pub)
 mqtt.connect()
