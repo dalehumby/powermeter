@@ -1,5 +1,7 @@
 # Power Meter for recording electricity usage at home using MicroPython on ESP8266.
 
+![Installed hardware](/images/installed.jpg)
+
 Assumes your power meter has a flashing LED that flashes every e.g 1/1000th of
 a kWh and that you can place an optotransistor over the LED to trigger a pulse
 on a pin on the ESP8266.
@@ -9,7 +11,12 @@ Features
 - Prometheus `/metrics` endpoint to get details about power usage for display in Grafana
 - Link to Home Assistant and Node-Red by publishing on the MQTT `powermeter` topic
 
-Tested with MicroPython 1.13
+Tested with 
+- MicroPython 1.13
+- Wemos D1 Mini ESP8266
+
+![Web server](/images/web.png)
+![Prometheus metrics](/images/prometheus.png)
 
 # How to set up
 
@@ -49,5 +56,8 @@ Installation instructions at https://github.com/scientifichackers/ampy
 
 # Where to buy
 - [Communica](https://www.communica.co.za/products/bmt-d1-mini-pro-esp8266-16m-ant) or [Micro Robotics](https://www.robotics.org.za/MINI-D1-4M) supply a cheap [D1 Mini board](https://www.wemos.cc/en/latest/tutorials/d1/get_started_with_micropython_d1.html)
+- [Ambient light sensor](https://www.communica.co.za/products/bmt-ambient-light-sensor), also from Communica, but pretty much any light dependent resistor (LDR) or optotransistor board will work
 
+# Learn More
+ I made a full presentation on [Home Automation with MicroPython, the ESP8266 and Google Home](http://www.dalehumby.com/blog/Home-automation-with-MicroPython/) at Google DevFest 2020. It includes my slides and [YouTube presentation](https://youtu.be/pRu_9WTazDM?t=969) for building this Power Meter, as well as a short intro to MicroPython.
  

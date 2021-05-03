@@ -231,9 +231,6 @@ power_meter = PowerMeter(config["pulse_per_kwh"])
 # Setup hardware
 pulse_pin = Pin(config["pulse_pin"], Pin.IN)
 pulse_pin.irq(handler=pulse_isr, trigger=Pin.IRQ_RISING)
-led_pin = Pin(
-    config["led_pin"], Pin.IN, Pin.PULL_UP
-)  # Set high impedence, turns off led
 
 # Setup Wifi
 station = network.WLAN(network.STA_IF)

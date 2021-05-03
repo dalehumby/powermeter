@@ -1,16 +1,17 @@
 {
   "wifi": {
-    "ssid": "your-ssid",
-    "password": "your-password",
+    "$comment": "WiFi settings for ESP to connect to your wifi, including this devices static IP. Remove if not needed or static IP managed managed by router",
+    "ssid": "your-wifi-ssid",
+    "password": "your-wifi-password",
     "ip": "10.0.0.11"
   },
   "pulse_per_kwh": 1000,
   "pulse_pin": 5,
-  "led_pin": 2,
   "mqtt": {
+    "$comment": "MQTT broker settings: your brokers IP, and this devices username and password if required by broker. If not required set username and password as null",
     "server": "10.0.0.10",
-    "username": null,
-    "password": null
+    "username": "mqtt-username",
+    "password": "mqtt-password"
   }
 }
 
